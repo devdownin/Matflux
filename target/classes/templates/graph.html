@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Graph View')}"></head>
+<body>
+
+<div class="toolbar">
+    <h1>Flow Matrix - Graph</h1>
+    <a href="/"><md-outlined-button>Dashboard</md-outlined-button></a>
+    <a th:href="@{/graph}"><md-filled-button>Graph</md-filled-button></a>
+    <a th:href="@{/diff}"><md-outlined-button>Compare (Diff)</md-outlined-button></a>
+</div>
+
+<main>
+    <div class="filter-bar">
+        <form id="filterForm" th:action="@{/graph}" method="get">
+             <md-outlined-select label="Environment" name="env" onchange="this.form.submit()">
+                <md-select-option value="" th:selected="${selectedEnv == null or selectedEnv.isBlank()}"><div slot="headline">All</div></md-select-option>
+                <md-select-option th:each="envOpt : ${environments}" th:value="${envOpt}" th:selected="${envOpt.equals(selectedEnv)}"><div slot="headline" th:text="${envOpt}"></div></md-select-option>
+            </md-outlined-select>
+
+            <md-outlined-select id="layoutSelector" label="Layout">
+                <md-select-option value="force" selected><div slot="headline">Force Directed</div></md-select-option>
+                <md-select-option value="hierarchical"><div slot="headline">Hierarchical</div></md-select-option>
+            </md-outlined-select>
+
+            <md-filled-tonal-button id="exportPngBtn">Export PNG</md-filled-tonal-button>
+            <md-filled-tonal-button id="copyLinkBtn">Copy Link</md-filled-tonal-button>
+        </form>
+    </div>
+
+    <div class="legend" id="legend-container">
+        <div th:each="nodeType : ${nodeTypes}"
+             th:data-type="${nodeType.name()}"
+             th:classappend="${#lists.contains(selectedTypes, nodeType.name()) or #lists.isEmpty(selectedTypes) ? 'active' : ''}"
+             class="legend-item">
+            <span th:classappend="'chip-' + ${nodeType.name()}" class="chip">
+                <span class="material-symbols-outlined" th:text="${nodeType.icon}"></span>
+                <span th:text="${nodeType.name()}"></span>
+            </span>
+        </div>
+    </div>
+
+    <div id="graph-container"></div>
+
+    <div id="nodeDrawer" class="node-drawer">
+        <md-icon-button class="node-drawer-close" onclick="$('#nodeDrawer').removeClass('open')"><span class="material-symbols-outlined">close</span></md-icon-button>
+        <h3 id="drawerNodeId"></h3>
+        <div id="drawerNodeContent"></div>
+    </div>
+
+</main>
+
+<script th:src="@{/js/graph.js}"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    $(document).ready(function () {
+        const params = new URLSearchParams(window.location.search);
+        const dataUrl = '/graph/data' + window.location.search;
+        const initialLayout = $('#layoutSelector').val();
+
+        initGraph(dataUrl, initialLayout, onNodeClick);
+
+        $('#layoutSelector').on('change', function() {
+            initGraph(dataUrl, $(this).val(), onNodeClick);
+        });
+
+        function onNodeClick(nodeId) {
+            $.get('/graph/node?key=' + encodeURIComponent(nodeId), function(data) {
+                $('#drawerNodeId').text(nodeId);
+                let content = '<h4>Incoming</h4><ul>';
+                data.incoming.forEach(f => { content += `<li>${f.srcKey} (${f.protocol})</li>`; });
+                content += '</ul><h4>Outgoing</h4><ul>';
+                data.outgoing.forEach(f => { content += `<li>${f.dstKey} (${f.protocol})</li>`; });
+                content += '</ul>';
+                $('#drawerNodeContent').html(content);
+                $('#nodeDrawer').addClass('open');
+            });
+        }
+
+        $('#legend-container .legend-item').on('click', function() {
+            const type = $(this).data('type');
+            const url = new URL(window.location);
+            let types = url.searchParams.getAll('types');
+
+            if (types.includes(type)) {
+                types = types.filter(t => t !== type);
+            } else {
+                types.push(type);
+            }
+
+            url.searchParams.delete('types');
+            types.forEach(t => url.searchParams.append('types', t));
+            window.location.href = url.toString();
+        });
+
+        $('#copyLinkBtn').on('click', function() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('Link copied to clipboard!');
+            });
+        });
+    });
+    /*]]>*/
+</script>
+
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Diff View')}"></head>
+<body>
+
+<div class="toolbar">
+    <h1>Flow Matrix - Diff</h1>
+    <a href="/"><md-outlined-button>Dashboard</md-outlined-button></a>
+    <a th:href="@{/graph}"><md-outlined-button>Graph</md-outlined-button></a>
+    <a th:href="@{/diff}"><md-filled-button>Compare (Diff)</md-filled-button></a>
+</div>
+
+<main>
+    <div class="diff-form">
+        <form th:action="@{/diff/upload}" method="post" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 16px;">
+            <label>File A (Before):
+                <input type="file" name="fileA" required>
+            </label>
+            <label>File B (After):
+                <input type="file" name="fileB" required>
+            </label>
+            <md-filled-button type="submit">Compare</md-filled-button>
+        </form>
+        <div th:if="${success}" style="color: green;" th:text="${success}"></div>
+        <div th:if="${error}" style="color: red;" th:text="${error}"></div>
+    </div>
+
+    <div th:if="${hasDiffData}" class="filter-bar">
+        <form id="diffFilterForm" th:action="@{/diff}" method="get">
+            <md-outlined-select label="Show" name="only" onchange="updateTableData()">
+                <md-select-option value="all" selected><div slot="headline">All</div></md-select-option>
+                <md-select-option value="added"><div slot="headline">Added</div></md-select-option>
+                <md-select-option value="removed"><div slot="headline">Removed</div></md-select-option>
+                <md-select-option value="modified"><div slot="headline">Modified</div></md-select-option>
+            </md-outlined-select>
+        </form>
+        <a id="exportCsvLink" href="/diff/export/csv?only=all"><md-filled-tonal-button>Export CSV</md-filled-tonal-button></a>
+    </div>
+
+    <div th:if="${hasDiffData}">
+        <table id="diffTable" class="display" style="width:100%">
+            <thead>
+            <tr>
+                <th>Type</th>
+                <th>Environment</th>
+                <th>Flow A (Before)</th>
+                <th>Flow B (After)</th>
+                <th>Changed Fields</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</main>
+
+<script>
+    let diffTable;
+    $(document).ready(function () {
+        if ($('#diffTable').length) {
+            diffTable = $('#diffTable').DataTable({
+                processing: true,
+                serverSide: false, // Data loaded client-side
+                ajax: {
+                    url: '/diff/data?only=all',
+                    dataSrc: ''
+                },
+                columns: [
+                    { data: 'kind', render: (data) => `<span class="chip chip-${data}">${data}</span>` },
+                    { data: 'recordA.environment', render: (data, type, row) => data || row.recordB.environment },
+                    { data: 'recordA', render: (data) => data ? `${data.srcKey} -> ${data.dstKey} (${data.protocol})` : '' },
+                    { data: 'recordB', render: (data) => data ? `${data.srcKey} -> ${data.dstKey} (${data.protocol})` : '' },
+                    { data: 'changedFields', render: (data) => data ? data.join(', ') : '' }
+                ]
+            });
+        }
+    });
+
+    function updateTableData() {
+        const filter = $('md-outlined-select[name="only"]').val();
+        const ajaxUrl = `/diff/data?only=${filter}`;
+        diffTable.ajax.url(ajaxUrl).load();
+
+        const exportUrl = `/diff/export/csv?only=${filter}`;
+        $('#exportCsvLink').attr('href', exportUrl);
+    }
+</script>
+
+</body>
+</html>

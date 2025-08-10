@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head :: head('Main Dashboard')}"></head>
+<body>
+
+<div class="toolbar">
+    <h1>Flow Matrix</h1>
+    <a href="/"><md-filled-button>Dashboard</md-filled-button></a>
+    <a th:href="@{/graph}"><md-outlined-button>Graph</md-outlined-button></a>
+    <a th:href="@{/diff}"><md-outlined-button>Compare (Diff)</md-outlined-button></a>
+</div>
+
+<main>
+    <div class="upload-form">
+        <form th:action="@{/upload}" method="post" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 16px;">
+            <label>
+                <input type="file" name="file" required style="display: none;" onchange="$('#filename').text(this.files[0].name)">
+                <md-outlined-button>Select Excel File</md-outlined-button>
+                <span id="filename"></span>
+            </label>
+            <md-filled-button type="submit">Upload</md-filled-button>
+        </form>
+        <div th:if="${success}" style="color: green;" th:text="${success}"></div>
+        <div th:if="${error}" style="color: red;" th:text="${error}"></div>
+        <div th:if="${hasData}" style="color: green;">✅ Data loaded</div>
+    </div>
+
+    <div th:if="${hasData}" class="filter-bar">
+        <form th:action="@{/}" method="get" style="display: flex; align-items: center; gap: 16px;">
+            <md-outlined-select label="Environment" onchange="this.form.submit()">
+                <md-select-option value="" th:selected="${selectedEnv == null or selectedEnv.isBlank()}">
+                    <div slot="headline">All Environments</div>
+                </md-select-option>
+                <md-select-option th:each="envOpt : ${environments}"
+                                  th:value="${envOpt}"
+                                  th:selected="${envOpt.equals(selectedEnv)}">
+                                  <div slot="headline" th:text="${envOpt}"></div>
+                </md-select-option>
+            </md-outlined-select>
+            <input type="hidden" name="env" th:value="${selectedEnv}">
+        </form>
+        <a th:href="@{/export/csv(env=${selectedEnv})}"><md-filled-tonal-button>Export CSV</md-filled-tonal-button></a>
+    </div>
+
+    <div th:if="${hasData}">
+        <table id="flowsTable" class="display" style="width:100%">
+            <thead>
+            <tr>
+                <th>Environment</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Protocol</th>
+                <th style="display:none;">SrcType</th>
+                <th style="display:none;">DstType</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${records}">
+                <td th:text="${r.environment}"></td>
+                <td>
+                    <span th:classappend="'chip-' + ${r.srcType.name()}" class="chip">
+                        <span class="material-symbols-outlined" th:text="${r.srcType.icon}"></span>
+                        <span th:text="${r.srcType.name()}"></span>
+                    </span>
+                    <br>
+                    <span th:text="${r.srcDns != null and !r.srcDns.isBlank() ? r.srcDns : r.srcIp}"></span>
+                </td>
+                <td>
+                    <span th:classappend="'chip-' + ${r.dstType.name()}" class="chip">
+                        <span class="material-symbols-outlined" th:text="${r.dstType.icon}"></span>
+                        <span th:text="${r.dstType.name()}"></span>
+                    </span>
+                    <br>
+                    <span th:text="${r.dstDns != null and !r.dstDns.isBlank() ? r.dstDns : r.dstIp}"></span>
+                </td>
+                <td th:text="${r.protocol}"></td>
+                <td style="display:none;" th:text="${r.srcType.name()}"></td>
+                <td style="display:none;" th:text="${r.dstType.name()}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+<script>
+    $(document).ready(function () {
+        $('#flowsTable').DataTable({
+            pageLength: 25
+        });
+
+        $('md-outlined-select[label="Environment"]').on('change', function(e) {
+            const selectedValue = e.target.value;
+            const form = $(this).closest('form');
+            form.find('input[name="env"]').val(selectedValue);
+            form.submit();
+        });
+    });
+</script>
+
+</body>
+</html>
